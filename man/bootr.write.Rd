@@ -17,4 +17,3 @@ This function allows you to write the output of a bootstrap run to an HTML file.
 bootr.write()
 }
 \keyword{bootstrap}
-

@@ -20,4 +20,3 @@ This function allows you to get the estimates from a bootstrap run.
 bootr.get_parameters()
 }
 \keyword{bootstrap}
-

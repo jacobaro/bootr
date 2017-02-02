@@ -5,6 +5,7 @@ devtools::use_package("purrr")
 devtools::use_package("cem")
 devtools::use_package("parallel")
 # devtools::use_readme_md()
+# devtools::document()
 
 # imports
 #' @importFrom parallel detectCores
@@ -27,7 +28,11 @@ get_coefficient_panel = function(model, formula, data, omit, ...) {
 }
 
 # boot function
-boot_function = function(x, i, model, formula, formula_match, cem_cutpoints, treatment, predictions, predictions_func, cpanel, unscale = NULL, weights = 1, ...) {
+boot_function = function(x, i, model, formula, formula_match, cem_cutpoints, treatment, predictions, predictions_func, cpanel,
+                         unscale, weights = 1, ...) {
+  # set weights
+  x$weights = weights
+
   # data
   dt = x[i,]
 
@@ -38,13 +43,20 @@ boot_function = function(x, i, model, formula, formula_match, cem_cutpoints, tre
     dt$weights = dcem$w
     imb = dcem$imbalance$L1$L1
   } else {
-    dt$weights = weights
     imb = NA
   }
 
-  # run
+  # filter the data
   dt = dplyr::filter(dt, weights > 0)
-  m = model(formula = formula, data = dt, weights = weights, ...)
+
+  # try to run the model
+  m = NA
+  try(m <- model(formula = formula, data = dt, weights = weights, ...), T)
+
+  # if the model ran then go, otherwise return
+  if(!is.list(m)) {
+    return(m)
+  }
 
   # get coefficients
   vals = coef(m)
@@ -52,17 +64,17 @@ boot_function = function(x, i, model, formula, formula_match, cem_cutpoints, tre
   names(coef) = cpanel$coefficient
 
   # should we produce predictions?
-  if(is.list(predictions) & !is.null(predictions$predictions)) {
+  if(is.list(predictions) & is.list(predictions$predictions)) {
     # predictions
     pr = (purrr::by_row(predictions$predictions, predictions_func, model = m, full_data = dt, weighted_mean = dt$weights, .collate = "cols", .to = "value"))$value
-    if(!is.null(unscale)) pr = unscale(pr, dt$dv)
+    if(!is.null(unscale)) pr = unscale(pr)
     names(pr) = paste("pr_", 1:length(pr))
   } else {
-    pr = NA
+    pr = NULL
   }
 
   # should we produce contrasts?
-  if(is.list(predictions) & !is.null(predictions$contrasts) & !is.na(pr)) {
+  if(is.list(predictions) & is.list(predictions$contrasts) & !is.null(pr)) {
     # contrasts
     get_contrast = function(x, pr) {
       if(is.list(x)) {
@@ -74,7 +86,7 @@ boot_function = function(x, i, model, formula, formula_match, cem_cutpoints, tre
     ct = sapply(predictions$contrasts, get_contrast, pr = pr)
     names(ct) = names(predictions$contrasts)
   } else {
-    ct = NA
+    ct = NULL
   }
 
   # get additional model info
@@ -98,12 +110,14 @@ boot_function = function(x, i, model, formula, formula_match, cem_cutpoints, tre
 #' @param predictions A list with two dataframes (defaults to "NULL"): "predictions" contains a set of values to produce predictions for;
 #'                    "contrasts" contains a list of vectors or lists that for which contrasts should be produced.
 #' @param omit A string that contains the partial name of all variables to exclude from being returned (they will still be in the model).
+#' @param unscale An optional function to unscale predictions.
 #' @keywords bootstrap
 #' @export
 #' @examples
 #' bootr()
 
-bootr = function(numruns = 1000, model = lm, formula, weights = NULL, formula_match = NULL, cem_cutpoints = NULL, data, predictions = NULL, omit = NULL) {
+bootr = function(numruns = 1000, model = lm, formula, weights = NULL, formula_match = NULL, cem_cutpoints = NULL,
+                 data, predictions = NULL, omit = NULL, unscale = NULL, ...) {
   # check number of cores
   numcores = 4 #detectCores() - 1
 
@@ -117,13 +131,22 @@ bootr = function(numruns = 1000, model = lm, formula, weights = NULL, formula_ma
     treatment = NULL
   }
 
+  # set the weights
+  if(is.null(weights)) {
+    weights = 1
+  }
+
   # run the actual bootstrap
-  bout = boot(data, boot_function, numruns, parallel = "snow", ncpus = numcores, #sim = "ordinary", stype = "i", strata = rep(1, nrow(data)),
+  bout = boot(data, boot_function, numruns, parallel = "snow", ncpus = numcores,
            model = model, formula = formula, formula_match = formula_match, cem_cutpoints = cem_cutpoints, treatment = treatment,
-           predictions = predictions, predictions_func = bootr.predictions, cpanel = cpanel, weights = weights)
+           predictions = predictions, predictions_func = bootr.predictions, cpanel = cpanel, unscale = unscale, weights = weights, ...)
 
   # get results
   out = lapply(1:length(bout$t0), bootr.get_parameters, bout = bout) %>% bind_rows
+
+  # identify how many runs were successfull
+  out = out %>%
+    bind_rows(data_frame(c_name = "Number of Replications", c_val = length(na.omit(bout$t[,1])), c_low = NA, c_high = NA, p_value = NA))
 
   # return the result
   return(out)
@@ -186,11 +209,6 @@ bootr.predictions = function(new_data, model, full_data, func = predict, weighte
 #' bootr.get_parameters()
 
 bootr.get_parameters = function(i, bout, type = "perc") {
-  # return if NA
-  if(is.na(bout$t0[i])) {
-    return(NULL)
-  }
-
   # get name
   name = names(bout$t0[i])
   if(is.null(name)) name = i
@@ -198,6 +216,11 @@ bootr.get_parameters = function(i, bout, type = "perc") {
   # check to see if there is a problem
   if(is.na(bout$t0[i])) {
     return(data_frame("c_name" = name, "c_val" = NA, "c_low" = NA, "c_high" = NA, "p_value" = NA))
+  }
+
+  # check to make sure we have variance on the term
+  if(var(bout$t[, i], na.rm = T) == 0) {
+    return(data_frame("c_name" = name, "c_val" = bout$t0[i], "c_low" = NA, "c_high" = NA, "p_value" = NA))
   }
 
   # get the different confidence intervals
@@ -216,7 +239,7 @@ bootr.get_parameters = function(i, bout, type = "perc") {
   p_value = sapply(1:5, function(x) { ifelse((p[[4, x]][cl] < 0 & p[[4, x]][cu] < 0) | (p[[4, x]][cl] > 0 & p[[4, x]][cu] > 0), 1 - p[[4, x]][1], 1) }) %>% min
 
   # assemble our return for the 95% confidence interval
-  r = data_frame("c_name" = name, "c_val" = bout$t0[i], "c_low" = p[[4, 3]][cl], "c_high" = p[[4, 3]][cu], "p_value" = p_value)
+  r = data_frame("c_name" = name, "c_val" = median(bout$t[,i], na.rm = T), "c_low" = p[[4, 3]][cl], "c_high" = p[[4, 3]][cu], "p_value" = p_value) # bout$t0[i]
 
   # return
   return(r)

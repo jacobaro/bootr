@@ -26,4 +26,3 @@ bootr.predictions()
 }
 \keyword{bootstrap}
 \keyword{predict,}
-

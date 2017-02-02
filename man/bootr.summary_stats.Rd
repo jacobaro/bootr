@@ -17,4 +17,3 @@ bootr.summary_stats()
 }
 \keyword{stats}
 \keyword{summary}
-
