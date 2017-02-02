@@ -219,7 +219,7 @@ bootr.get_parameters = function(i, bout, type = "perc") {
   }
 
   # check to make sure we have variance on the term
-  if(var(bout$t[, i], na.rm = T) == 0) {
+  if(var(bout$t[, i], na.rm = T) == 0 | length(unique(na.omit(bout$t[, i]))) < 2) {
     return(data_frame("c_name" = name, "c_val" = bout$t0[i], "c_low" = NA, "c_high" = NA, "p_value" = NA))
   }
 
