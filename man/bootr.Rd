@@ -4,8 +4,9 @@
 \alias{bootr}
 \title{Run a bootstrap}
 \usage{
-bootr(numruns = 1000, model = lm, formula, formula_match = NULL,
-  cem_cutpoints = NULL, data, predictions = NULL, omit = NULL)
+bootr(numruns = 1000, model = lm, formula, weights = NULL,
+  formula_match = NULL, cem_cutpoints = NULL, data, predictions = NULL,
+  omit = NULL, unscale = NULL)
 }
 \arguments{
 \item{numruns}{The number of iterations.}
@@ -13,6 +14,8 @@ bootr(numruns = 1000, model = lm, formula, formula_match = NULL,
 \item{model}{The statistical model (defaults to "lm").}
 
 \item{formula}{The formula to use for the model.}
+
+\item{weights}{Optional list of weights to use (if a matching formula is also present that will take precedence).}
 
 \item{formula_match}{An optional matching formula (defaults to "NULL"). The first variable in the formual is used as the treatment.}
 
@@ -24,6 +27,8 @@ bootr(numruns = 1000, model = lm, formula, formula_match = NULL,
 "contrasts" contains a list of vectors or lists that for which contrasts should be produced.}
 
 \item{omit}{A string that contains the partial name of all variables to exclude from being returned (they will still be in the model).}
+
+\item{unscale}{An optional function to unscale predictions.}
 }
 \description{
 This function is a wrapper for "boot" that runs a model and produces relevant outputs.
@@ -32,4 +37,3 @@ This function is a wrapper for "boot" that runs a model and produces relevant ou
 bootr()
 }
 \keyword{bootstrap}
-
