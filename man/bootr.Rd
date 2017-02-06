@@ -6,7 +6,7 @@
 \usage{
 bootr(numruns = 1000, model = lm, formula, weights = NULL,
   formula_match = NULL, cem_cutpoints = NULL, data, predictions = NULL,
-  omit = NULL, unscale = NULL)
+  omit = NULL, unscale = NULL, ...)
 }
 \arguments{
 \item{numruns}{The number of iterations.}

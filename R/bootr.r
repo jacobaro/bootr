@@ -175,7 +175,7 @@ bootr.predictions = function(new_data, model, full_data, func = predict, weighte
   }
 
   # get predictions
-  r = func(model, update.data_frame(full_data, new_data), ...)
+  r = func(model, update.data_frame(full_data, new_data), type = "response", ...)
 
   # get the mean
   if(NCOL(r) > 1) { # for multiple outcomes
@@ -219,7 +219,7 @@ bootr.get_parameters = function(i, bout, type = "perc") {
   }
 
   # check to make sure we have variance on the term
-  if(var(bout$t[, i], na.rm = T) == 0 | length(unique(na.omit(bout$t[, i]))) < 2) {
+  if(length(unique(na.omit(bout$t[, i]))) < 2 | var(bout$t[, i], na.rm = T) == 0) {
     return(data_frame("c_name" = name, "c_val" = bout$t0[i], "c_low" = NA, "c_high" = NA, "p_value" = NA))
   }
 
