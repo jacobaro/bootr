@@ -272,3 +272,11 @@ bootr.out.add.lm = function(m) {
   # return
   return(c("N" = length(m$residuals), "AIC" = round(AIC(m), 3), "Adj R2" = round(ars, 3)))
 }
+
+# log1p function that allows for negatives
+log1p2 = function(x) {
+  r = x
+  r[!is.na(x) & x >= 0] = log1p(x[!is.na(x) & x >= 0])
+  r[!is.na(x) & x < 0] = -log1p(-x[!is.na(x) & x < 0])
+  r
+}
